@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: transactional-outbox-poc
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/outboxdb
+    username: outboxuser
+    password: outboxpass
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
