@@ -4,15 +4,21 @@ import com.rafaelfraga.transactional_outbox_poc.controller.dto.request.Ingestion
 import com.rafaelfraga.transactional_outbox_poc.controller.dto.response.IngestionResponseDto
 import com.rafaelfraga.transactional_outbox_poc.domain.IngestionRequest
 import com.rafaelfraga.transactional_outbox_poc.domain.IngestionStatus
+import com.rafaelfraga.transactional_outbox_poc.domain.OutboxAggregateType
+import com.rafaelfraga.transactional_outbox_poc.domain.OutboxEvent
+import com.rafaelfraga.transactional_outbox_poc.domain.OutboxEventType
+import com.rafaelfraga.transactional_outbox_poc.domain.OutboxStatus
 import com.rafaelfraga.transactional_outbox_poc.exception.IngestionNotFoundException
 import com.rafaelfraga.transactional_outbox_poc.repository.IngestionRequestRepository
+import com.rafaelfraga.transactional_outbox_poc.repository.OutboxEventRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
 class IngestionService(
-    private val repository: IngestionRequestRepository
+    private val repository: IngestionRequestRepository,
+    private val outboxRepository: OutboxEventRepository
 ) {
 
     @Transactional
@@ -39,6 +45,17 @@ class IngestionService(
         )
 
         val savedRequest = repository.save(newRequest)
+
+        val outboxEvent = OutboxEvent(
+            eventId = UUID.randomUUID(),
+            aggregateType = OutboxAggregateType.INGESTION_REQUEST,
+            aggregateId = savedRequest.id!!,
+            eventType = OutboxEventType.INGESTION_RECEIVED,
+            payload = savedRequest.payload,
+            status = OutboxStatus.PENDING
+        )
+
+        outboxRepository.save(outboxEvent)
 
         return IngestionResponseDto(
             protocol = savedRequest.protocol,
