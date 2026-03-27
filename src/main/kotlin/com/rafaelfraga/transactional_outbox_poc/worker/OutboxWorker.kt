@@ -6,44 +6,45 @@ import com.rafaelfraga.transactional_outbox_poc.service.OutboxProcessingService
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
+import java.util.UUID
 
 @Component
 class OutboxWorker(
-    private val outboxEventRepository: OutboxEventRepository,
     private val outboxProcessingService: OutboxProcessingService
 ) {
 
     private val logger = LoggerFactory.getLogger(OutboxWorker::class.java)
+    private val workerId = "worker-${UUID.randomUUID()}"
 
     @Scheduled(fixedDelay = 5000)
     fun processPendingEvents() {
-        val events = outboxEventRepository
-            .findTop10ByStatusOrderByCreatedAtAsc(OutboxStatus.PENDING)
+        val claimedEventIds = outboxProcessingService
+            .claimPendingEvents(
+                batchSize = 10,
+                workerId = workerId
+            )
 
-        if (events.isEmpty()) {
-            logger.debug("No pending outbox events found")
+        if (claimedEventIds.isEmpty()) {
+            logger.debug("No pending outbox events claimed by {}", workerId)
             return
         }
 
-        logger.info("Processing {} outbox events", events.size)
+        logger.info("Worker {} claimed {} outbox events", workerId, claimedEventIds.size)
 
-        events.forEach { event ->
+        claimedEventIds.forEach { eventId ->
             try {
-                logger.info("Processing eventId={}", event.id)
-
-                outboxProcessingService.markAsProcessing(event.id!!)
+                logger.info("Worker {} processing eventId={}", workerId, eventId)
 
                 simulateProcessing()
 
-                outboxProcessingService.completeProcessing(event.id!!)
+                outboxProcessingService.completeProcessing(eventId)
 
-                logger.info("Processed eventId={}", event.id)
-
+                logger.info("Worker {} successfully processed eventId={}", workerId, eventId)
             } catch (ex: Exception) {
                 logger.error(
-                    "Failed processing eventId={}, aggregateId={}",
-                    event.id,
-                    event.aggregateId,
+                    "Worker {} failed processing eventId={}",
+                    workerId,
+                    eventId,
                     ex
                 )
             }

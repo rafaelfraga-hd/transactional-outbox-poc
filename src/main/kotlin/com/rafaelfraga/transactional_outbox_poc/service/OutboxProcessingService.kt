@@ -1,11 +1,13 @@
 package com.rafaelfraga.transactional_outbox_poc.service
 
 import com.rafaelfraga.transactional_outbox_poc.domain.IngestionStatus
+import com.rafaelfraga.transactional_outbox_poc.domain.OutboxEvent
 import com.rafaelfraga.transactional_outbox_poc.domain.OutboxStatus
 import com.rafaelfraga.transactional_outbox_poc.exception.IngestionNotFoundAggregateException
 import com.rafaelfraga.transactional_outbox_poc.exception.OutboxEventNotFoundException
 import com.rafaelfraga.transactional_outbox_poc.repository.IngestionRequestRepository
 import com.rafaelfraga.transactional_outbox_poc.repository.OutboxEventRepository
+import org.springframework.cglib.core.Local
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
@@ -35,6 +37,29 @@ class OutboxProcessingService(
 
         ingestionRequest.status = IngestionStatus.PROCESSING
         ingestionRequest.updatedAt = LocalDateTime.now()
+    }
+
+    @Transactional
+    fun claimPendingEvents(batchSize: Int, workerId: String): List<Long>{
+        val events = outboxEventRepository.claimPendingEvents(batchSize)
+        val claimeAt = LocalDateTime.now()
+
+        events.forEach { event ->
+            val ingestionRequest = ingestionRequestRepository.findById(event.aggregateId)
+                .orElseThrow {
+                    IngestionNotFoundAggregateException(event.aggregateId)
+                }
+
+            event.status = OutboxStatus.PROCESSING
+            event.claimedBy = workerId
+            event.claimedAt = claimeAt
+            event.updatedAt = claimeAt
+
+            ingestionRequest.status = IngestionStatus.PROCESSING
+            ingestionRequest.updatedAt = claimeAt
+        }
+
+        return events.mapNotNull { it.id }
     }
 
     @Transactional

@@ -1,6 +1,8 @@
 package com.rafaelfraga.transactional_outbox_poc.domain
 
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -26,7 +28,8 @@ class OutboxEvent(
     @Column(name = "event_type", nullable = false, length = 100)
     val eventType: OutboxEventType,
 
-    @Column(name = "payload", nullable = false)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "payload", nullable = false, columnDefinition = "jsonb")
     val payload: String,
 
     @Enumerated(EnumType.STRING)
